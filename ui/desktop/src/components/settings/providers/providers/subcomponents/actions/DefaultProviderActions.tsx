@@ -26,7 +26,7 @@ function getDefaultTooltipMessages(name: string, actionType: string) {
 export default function DefaultProviderActions({
   name,
   isConfigured,
-  onConfigure,
+  onAdd,
   onDelete,
   onShowSettings,
 }: ProviderActionsProps) {
@@ -38,7 +38,7 @@ export default function DefaultProviderActions({
           tooltip={getDefaultTooltipMessages(name, 'add')}
           onClick={(e) => {
             e.stopPropagation();
-            onConfigure?.();
+            onAdd?.();
           }}
         />
       )}

@@ -5,6 +5,7 @@ import Settings from '../settings/Settings';
 import MoreModelsSettings from '../settings/models/MoreModels';
 import ConfigureProviders from '../settings/providers/ConfigureProviders';
 import { WelcomeScreen } from '../welcome_screen/WelcomeScreen';
+import ProviderSettings from '../settings/providers/providers/NewProviderSettingsPage';
 
 export const ChatRoutes = ({
   chats,
@@ -30,6 +31,7 @@ export const ChatRoutes = ({
       }
     />
     <Route path="/settings" element={<Settings />} />
+    <Route path="/new-providers-page" element={<ProviderSettings />} />
     <Route path="/settings/more-models" element={<MoreModelsSettings />} />
     <Route path="/settings/configure-providers" element={<ConfigureProviders />} />
     <Route path="/welcome" element={<WelcomeScreen />} />

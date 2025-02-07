@@ -1,36 +1,32 @@
 import React from 'react';
 import { AddButton, DeleteButton, GearSettingsButton, RefreshButton } from './ActionButtons';
-
-interface OllamaConfigDetails {
-  is_set: boolean;
-  location: 'app' | 'host' | null;
-}
+import OllamaMetadata from '../../interfaces/OllamaMetadata';
 
 interface OllamaActionsProps {
   isConfigured: boolean;
-  ollamaConfig: OllamaConfigDetails;
+  ollamaMetadata: OllamaMetadata;
   onRefresh?: (e: React.MouseEvent) => void;
-  onConfigure?: () => void;
+  onAdd?: () => void;
   onDelete?: () => void;
   onShowSettings?: () => void;
 }
 
 export default function OllamaActions({
   isConfigured,
-  ollamaConfig,
+  ollamaMetadata,
   onRefresh,
-  onConfigure,
+  onAdd,
   onDelete,
   onShowSettings,
 }: OllamaActionsProps) {
-  const showHostDeleteButton = isConfigured && ollamaConfig.location === 'host' && !onDelete;
+  const showHostDeleteButton = isConfigured && ollamaMetadata.location === 'host' && !onDelete;
 
   const showRefreshButton = !isConfigured && onRefresh;
 
-  const showAddHostUrlButton = isConfigured && ollamaConfig.location === 'app' && onConfigure;
+  const showAddHostUrlButton = isConfigured && ollamaMetadata.location === 'app' && onAdd;
 
   const showHostUrlSettingsButton =
-    isConfigured && ollamaConfig.location === 'host' && onShowSettings;
+    isConfigured && ollamaMetadata.location === 'host' && onShowSettings;
 
   // We’ll figure out which buttons to render:
 
@@ -58,7 +54,7 @@ export default function OllamaActions({
           tooltip="Switch to custom OLLAMA_HOST."
           onClick={(e) => {
             e.stopPropagation();
-            onConfigure();
+            onAdd?.();
           }}
         ></AddButton>
       )}
@@ -69,7 +65,7 @@ export default function OllamaActions({
           tooltip="Delete OLLAMA_HOST."
           onClick={(e) => {
             e.stopPropagation();
-            onDelete();
+            onDelete?.();
           }}
         ></DeleteButton>
       )}

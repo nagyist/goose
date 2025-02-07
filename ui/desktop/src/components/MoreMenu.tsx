@@ -269,11 +269,11 @@ export default function MoreMenu() {
             <button
               onClick={() => {
                 setOpen(false);
-                navigate('/settings');
+                navigate('/new-providers-page');
               }}
               className="w-full text-left p-2 text-sm hover:bg-bgSubtle transition-colors text-indigo-800"
             >
-              Delete Provider Keys from Keychain
+              Look at new grid
             </button>
             <button
               onClick={() => {

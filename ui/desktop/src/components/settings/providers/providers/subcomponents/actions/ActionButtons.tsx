@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button } from '../../../../ui/button';
+import { Button } from '../../../../../ui/button';
 import clsx from 'clsx';
 import { TooltipWrapper } from './TooltipWrapper';
 import { Check, Plus, RefreshCw, Rocket, Settings, X } from 'lucide-react';
@@ -30,12 +30,8 @@ export function ActionButton({
   variant = 'default',
   tooltip,
   className,
-  children,
   ...props
 }: ActionButtonProps) {
-  // If there's an icon prop, we'll render that.
-  // If there's also `children`, we can render both or decide how you want to handle that scenario.
-
   const ButtonElement = (
     <Button
       size={size}
@@ -44,7 +40,6 @@ export function ActionButton({
       {...props}
     >
       {Icon && <Icon className="!size-4" />}
-      {children}
     </Button>
   );
 

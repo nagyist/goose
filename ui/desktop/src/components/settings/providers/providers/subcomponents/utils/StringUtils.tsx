@@ -22,22 +22,10 @@ export function ConfiguredProviderTooltipMessage(name: string) {
   return `${name} provider is configured`;
 }
 
-export function ProviderDescription(name: { name: string }) {
-  function getProviderDescription(provider) {
-    const descriptions = {
-      OpenAI: 'Access GPT-4, GPT-3.5 Turbo, and other OpenAI models',
-      Anthropic: 'Access Claude and other Anthropic models',
-      Google: 'Access Gemini and other Google AI models',
-      Groq: 'Access Mixtral and other Groq-hosted models',
-      Databricks: 'Access models hosted on your Databricks instance',
-      OpenRouter: 'Access a variety of AI models through OpenRouter',
-      Ollama: 'Run and use open-source models locally',
-    };
-    return descriptions[provider] || `Access ${provider} models`;
-  }
+export function ProviderDescription(description) {
   return (
     <p className="text-xs text-textSubtle mt-1.5 mb-3 leading-normal overflow-y-auto max-h-[54px] ">
-      {getProviderDescription(name)}
+      {description}
     </p>
   );
 }
