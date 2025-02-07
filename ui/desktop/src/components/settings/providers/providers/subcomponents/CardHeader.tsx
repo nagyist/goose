@@ -12,15 +12,23 @@ interface CardHeaderProps {
   isConfigured: boolean;
 }
 
-function CardTitle(name: string) {
+// Make CardTitle a proper React component
+function CardTitle({ name }: { name: string }) {
   return <h3 className="text-base font-medium text-textStandard truncate mr-2">{name}</h3>;
 }
 
-function ProviderNameAndStatus(name, isConfigured) {
+// Properly type ProviderNameAndStatus props
+interface ProviderNameAndStatusProps {
+  name: string;
+  isConfigured: boolean;
+}
+
+function ProviderNameAndStatus({ name, isConfigured }: ProviderNameAndStatusProps) {
   const ollamaNotConfigured = !isConfigured && name === 'Ollama';
+
   return (
     <div className="flex items-center">
-      {CardTitle(name)}
+      <CardTitle name={name} />
 
       {/* Configured state: Green check */}
       {isConfigured && <GreenCheckButton tooltip={ConfiguredProviderTooltipMessage(name)} />}
@@ -31,7 +39,7 @@ function ProviderNameAndStatus(name, isConfigured) {
   );
 }
 
-// Name and status icon
+// Add a container div to the CardHeader
 export default function CardHeader({ name, description, isConfigured }: CardHeaderProps) {
   return (
     <>

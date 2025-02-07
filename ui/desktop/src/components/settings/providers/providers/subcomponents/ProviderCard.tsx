@@ -14,21 +14,39 @@ interface ProviderCardProps {
 }
 
 export function ProviderCard({ provider, providerCallbacks }: ProviderCardProps) {
-  const providerEntry: ProviderRegistry = PROVIDER_REGISTRY.find((p) => p.name === provider.name);
-  const providerDetails: ProviderDetails = providerEntry.details;
-  console.log('providerDetails', providerDetails);
-  const actions: ConfigurationAction[] = providerDetails.getActions(provider, providerCallbacks);
-  console.log('got these actions', actions);
-  return (
-    <CardContainer
-      header={
-        <CardHeader
-          name={providerDetails.name}
-          description={providerDetails.description}
-          isConfigured={provider.isConfigured}
-        />
-      }
-      body={<CardBody actions={actions} />}
-    />
-  );
+  const providerEntry = PROVIDER_REGISTRY.find((p) => p.name === provider.name);
+
+  // Add safety check
+  if (!providerEntry) {
+    console.error(`Provider ${provider.name} not found in registry`);
+    return null;
+  }
+
+  const providerDetails = providerEntry.details;
+  // Add another safety check
+  if (!providerDetails) {
+    console.error(`Provider ${provider.name} has no details`);
+    return null;
+  }
+  console.log('provider details', providerDetails);
+
+  try {
+    const actions = providerDetails.getActions(provider, providerCallbacks);
+
+    return (
+      <CardContainer
+        header={
+          <CardHeader
+            name={providerDetails.name}
+            description={providerDetails.description}
+            isConfigured={provider.isConfigured}
+          />
+        }
+        body={<CardBody actions={actions} />}
+      />
+    );
+  } catch (error) {
+    console.error(`Error rendering provider card for ${provider.name}:`, error);
+    return null;
+  }
 }
