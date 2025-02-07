@@ -4,9 +4,7 @@ import CardHeader from './CardHeader';
 import ProviderState from '../interfaces/ProviderState';
 import CardBody from './CardBody';
 import ProviderCallbacks from '../interfaces/ConfigurationCallbacks';
-import { PROVIDER_REGISTRY, ProviderRegistry } from '../ProviderRegistry';
-import ProviderDetails from '../interfaces/ProviderDetails';
-import ConfigurationAction from '../interfaces/ConfigurationAction';
+import { PROVIDER_REGISTRY } from '../ProviderRegistry';
 
 interface ProviderCardProps {
   provider: ProviderState;
