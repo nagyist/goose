@@ -82,7 +82,6 @@ export default function ChatView({
 }
 
 function ChatContent({
-  readyForAutoUserPrompt,
   chat,
   setChat,
   setView,
@@ -103,7 +102,6 @@ function ChatContent({
   const [droppedFiles, setDroppedFiles] = useState<string[]>([]);
 
   const scrollRef = useRef<ScrollAreaHandle>(null);
-  const hasSentPromptRef = useRef(false);
 
   const {
     summaryContent,
@@ -282,8 +280,9 @@ function ChatContent({
 
   // Update chat messages when they change and save to sessionStorage
   useEffect(() => {
-    setChat({ ...chat, messages });
-  }, [messages, setChat, chat]);
+    // @ts-expect-error - TypeScript being overly strict about the return type
+    setChat((prevChat: ChatType) => ({ ...prevChat, messages }));
+  }, [messages, setChat]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -291,13 +290,10 @@ function ChatContent({
     }
   }, [messages]);
 
-  useEffect(() => {
-    const prompt = recipeConfig?.prompt;
-    if (prompt && !hasSentPromptRef.current && readyForAutoUserPrompt) {
-      append(prompt);
-      hasSentPromptRef.current = true;
-    }
-  }, [recipeConfig?.prompt, append, readyForAutoUserPrompt]);
+  // Pre-fill input with recipe prompt instead of auto-sending it
+  const initialPrompt = useMemo(() => {
+    return recipeConfig?.prompt || '';
+  }, [recipeConfig?.prompt]);
 
   // Handle submit
   const handleSubmit = (e: React.FormEvent) => {
@@ -632,7 +628,7 @@ function ChatContent({
             isLoading={isLoading}
             onStop={onStopGoose}
             commandHistory={commandHistory}
-            initialValue={_input}
+            initialValue={_input || initialPrompt}
             setView={setView}
             hasMessages={hasMessages}
             numTokens={sessionTokenCount}
