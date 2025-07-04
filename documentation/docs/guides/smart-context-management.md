@@ -58,7 +58,7 @@ You can proactively summarize your conversation before reaching context limits:
 
 The CLI offers three context management options: summarize, truncate, or clear your session.
 
-### Default Context Strategy
+#### Default Context Strategy
 
 You can configure Goose to automatically handle context limits without prompting by setting the `GOOSE_CONTEXT_STRATEGY` environment variable:
 
@@ -68,11 +68,6 @@ export GOOSE_CONTEXT_STRATEGY=summarize  # Automatically summarize (recommended)
 export GOOSE_CONTEXT_STRATEGY=truncate   # Automatically remove oldest messages
 export GOOSE_CONTEXT_STRATEGY=clear      # Automatically clear session
 export GOOSE_CONTEXT_STRATEGY=prompt     # Always prompt user (default)
-```
-
-Or configure it permanently:
-```bash
-goose configure set GOOSE_CONTEXT_STRATEGY summarize
 ```
 
 **Default behavior:**
@@ -140,23 +135,52 @@ Key information has been preserved while reducing context length.
   </TabItem>
 </Tabs>
 
-### Token usage
-<Tabs>
+## Token Usage
+After sending your first message, Goose Desktop and Goose CLI display token usage.
+
+<Tabs groupId="interface">
     <TabItem value="ui" label="Goose Desktop" default>
-    After sending your first message to Goose, a colored circle appears next to the model name at the bottom of the session window. The color provides a visual indicator of your token usage for the session. 
+    The Desktop displays a colored circle next to the model name at the bottom of the session window. The color provides a visual indicator of your token usage for the session. 
       - **Green**: Normal usage - Plenty of context space available
       - **Orange**: Warning state - Approaching limit (80% of capacity)
       - **Red**: Error state - Context limit reached
     
     Hover over this circle to display:
-      - the number of tokens used
-      - the percentage of available tokens used
-      - the total available tokens
+      - The number of tokens used
+      - The percentage of available tokens used
+      - The total available tokens
       - A progress bar showing your current token usage
         
     </TabItem>
     <TabItem value="cli" label="Goose CLI">
-        This functionality is not available in the Goose CLI. 
+    The CLI displays a context label above each command prompt, showing:
+      - A visual indicator using dots (●○) and colors to represent your token usage:
+        - **Green**: Below 50% usage
+        - **Yellow**: Between 50-85% usage
+        - **Red**: Above 85% usage
+      - Usage percentage
+      - Current token count and context limit
 
+    </TabItem>
+</Tabs>
+
+## Cost Tracking
+Display real-time costs of your session at the bottom of the Goose Desktop window.
+
+<Tabs groupId="interface">
+    <TabItem value="ui" label="Goose Desktop" default>
+To manage live cost tracking:
+  1. Click `⚙️` in the upper right corner 
+  2. Click `Advanced Settings`
+  3. Scroll to `App Settings` and toggle `Cost Tracking` on or off.
+
+The session cost updates dynamically as tokens are consumed. Hover over the cost to see a detailed breakdown of token usage. If multiple models are used in the session, this includes a cost breakdown by model. Ollama and local deployments always show a cost of $0.00.
+
+Pricing data is regularly fetched from the OpenRouter API and cached locally. The `Advanced Settings` tab shows when the data was last updated and allows you to refresh. 
+
+These costs are estimates only, and not connected to your actual provider bill. The cost shown is an approximation based on token counts and public pricing data.
+</TabItem>
+    <TabItem value="cli" label="Goose CLI">
+    Cost tracking is [not yet available](https://github.com/block/goose/issues/3206) in the Goose CLI. 
     </TabItem>
 </Tabs>

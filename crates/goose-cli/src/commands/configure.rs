@@ -351,6 +351,7 @@ pub async fn configure_provider_dialog() -> Result<bool, Box<dyn Error>> {
                     .map(|m| (m, m.as_str(), ""))
                     .collect::<Vec<_>>(),
             )
+            .filter_mode() // enable "fuzzy search" filtering for the list of models
             .interact()?
             .to_string(),
         Ok(None) => {
@@ -442,10 +443,13 @@ pub fn toggle_extensions_dialog() -> Result<(), Box<dyn Error>> {
     }
 
     // Create a list of extension names and their enabled status
-    let extension_status: Vec<(String, bool)> = extensions
+    let mut extension_status: Vec<(String, bool)> = extensions
         .iter()
         .map(|entry| (entry.config.name().to_string(), entry.enabled))
         .collect();
+
+    // Sort extensions alphabetically by name
+    extension_status.sort_by(|a, b| a.0.cmp(&b.0));
 
     // Get currently enabled extensions for the selection
     let enabled_extensions: Vec<&String> = extension_status
@@ -504,20 +508,21 @@ pub fn configure_extensions_dialog() -> Result<(), Box<dyn Error>> {
         "built-in" => {
             let extension = cliclack::select("Which built-in extension would you like to enable?")
                 .item(
-                    "developer",
-                    "Developer Tools",
-                    "Code editing and shell access",
-                )
-                .item(
                     "computercontroller",
                     "Computer Controller",
                     "controls for webscraping, file caching, and automations",
+                )
+                .item(
+                    "developer",
+                    "Developer Tools",
+                    "Code editing and shell access",
                 )
                 .item(
                     "googledrive",
                     "Google Drive",
                     "Search and read content from google drive - additional config required",
                 )
+                .item("jetbrains", "JetBrains", "Connect to jetbrains IDEs")
                 .item(
                     "memory",
                     "Memory",
@@ -528,7 +533,6 @@ pub fn configure_extensions_dialog() -> Result<(), Box<dyn Error>> {
                     "Tutorial",
                     "Access interactive tutorials and guides",
                 )
-                .item("jetbrains", "JetBrains", "Connect to jetbrains IDEs")
                 .interact()?
                 .to_string();
 
@@ -773,10 +777,13 @@ pub fn remove_extension_dialog() -> Result<(), Box<dyn Error>> {
     let extensions = ExtensionConfigManager::get_all()?;
 
     // Create a list of extension names and their enabled status
-    let extension_status: Vec<(String, bool)> = extensions
+    let mut extension_status: Vec<(String, bool)> = extensions
         .iter()
         .map(|entry| (entry.config.name().to_string(), entry.enabled))
         .collect();
+
+    // Sort extensions alphabetically by name
+    extension_status.sort_by(|a, b| a.0.cmp(&b.0));
 
     if extensions.is_empty() {
         cliclack::outro(
@@ -840,6 +847,11 @@ pub async fn configure_settings_dialog() -> Result<(), Box<dyn Error>> {
             "Show more or less tool output",
         )
         .item(
+            "max_turns",
+            "Max Turns",
+            "Set maximum number of turns without user input",
+        )
+        .item(
             "experiment",
             "Toggle Experiment",
             "Enable or disable an experiment feature",
@@ -848,6 +860,11 @@ pub async fn configure_settings_dialog() -> Result<(), Box<dyn Error>> {
             "recipe",
             "Goose recipe github repo",
             "Goose will pull recipes from this repo if not found locally.",
+        )
+        .item(
+            "scheduler",
+            "Scheduler Type",
+            "Choose between built-in cron scheduler or Temporal workflow engine",
         )
         .interact()?;
 
@@ -864,11 +881,17 @@ pub async fn configure_settings_dialog() -> Result<(), Box<dyn Error>> {
         "tool_output" => {
             configure_tool_output_dialog()?;
         }
+        "max_turns" => {
+            configure_max_turns_dialog()?;
+        }
         "experiment" => {
             toggle_experiments_dialog()?;
         }
         "recipe" => {
             configure_recipe_dialog()?;
+        }
+        "scheduler" => {
+            configure_scheduler_dialog()?;
         }
         _ => unreachable!(),
     };
@@ -887,7 +910,7 @@ pub fn configure_goose_mode_dialog() -> Result<(), Box<dyn Error>> {
     let mode = cliclack::select("Which Goose mode would you like to configure?")
         .item(
             "auto",
-            "Auto Mode", 
+            "Auto Mode",
             "Full file modification, extension usage, edit, create and delete files freely"
         )
         .item(
@@ -1052,6 +1075,9 @@ pub async fn configure_tool_permissions_dialog() -> Result<(), Box<dyn Error>> {
         .collect();
     extensions.push("platform".to_string());
 
+    // Sort extensions alphabetically by name
+    extensions.sort();
+
     let selected_extension_name = cliclack::select("Choose an extension to configure tools")
         .items(
             &extensions
@@ -1215,5 +1241,91 @@ fn configure_recipe_dialog() -> Result<(), Box<dyn Error>> {
     } else {
         config.set_param(key_name, Value::String(input_value))?;
     }
+    Ok(())
+}
+
+fn configure_scheduler_dialog() -> Result<(), Box<dyn Error>> {
+    let config = Config::global();
+
+    // Check if GOOSE_SCHEDULER_TYPE is set as an environment variable
+    if std::env::var("GOOSE_SCHEDULER_TYPE").is_ok() {
+        let _ = cliclack::log::info("Notice: GOOSE_SCHEDULER_TYPE environment variable is set and will override the configuration here.");
+    }
+
+    // Get current scheduler type from config for display
+    let current_scheduler: String = config
+        .get_param("GOOSE_SCHEDULER_TYPE")
+        .unwrap_or_else(|_| "legacy".to_string());
+
+    println!(
+        "Current scheduler type: {}",
+        style(&current_scheduler).cyan()
+    );
+
+    let scheduler_type = cliclack::select("Which scheduler type would you like to use?")
+        .items(&[
+            ("legacy", "Built-in Cron (Default)", "Uses Goose's built-in cron scheduler. Simple and reliable for basic scheduling needs."),
+            ("temporal", "Temporal", "Uses Temporal workflow engine for advanced scheduling features. Requires Temporal CLI to be installed.")
+        ])
+        .interact()?;
+
+    match scheduler_type {
+        "legacy" => {
+            config.set_param("GOOSE_SCHEDULER_TYPE", Value::String("legacy".to_string()))?;
+            cliclack::outro(
+                "Set to Built-in Cron scheduler - simple and reliable for basic scheduling",
+            )?;
+        }
+        "temporal" => {
+            config.set_param(
+                "GOOSE_SCHEDULER_TYPE",
+                Value::String("temporal".to_string()),
+            )?;
+            cliclack::outro(
+                "Set to Temporal scheduler - advanced workflow engine for complex scheduling",
+            )?;
+            println!();
+            println!("📋 {}", style("Note:").bold());
+            println!("  • Temporal scheduler requires Temporal CLI to be installed");
+            println!("  • macOS: brew install temporal");
+            println!("  • Linux/Windows: https://github.com/temporalio/cli/releases");
+            println!("  • If Temporal is unavailable, Goose will automatically fall back to the built-in scheduler");
+            println!("  • The scheduling engines do not share the list of schedules");
+        }
+        _ => unreachable!(),
+    };
+
+    Ok(())
+}
+
+pub fn configure_max_turns_dialog() -> Result<(), Box<dyn Error>> {
+    let config = Config::global();
+
+    let current_max_turns: u32 = config.get_param("GOOSE_MAX_TURNS").unwrap_or(1000);
+
+    let max_turns_input: String =
+        cliclack::input("Set maximum number of agent turns without user input:")
+            .placeholder(&current_max_turns.to_string())
+            .default_input(&current_max_turns.to_string())
+            .validate(|input: &String| match input.parse::<u32>() {
+                Ok(value) => {
+                    if value < 1 {
+                        Err("Value must be at least 1")
+                    } else {
+                        Ok(())
+                    }
+                }
+                Err(_) => Err("Please enter a valid number"),
+            })
+            .interact()?;
+
+    let max_turns: u32 = max_turns_input.parse()?;
+    config.set_param("GOOSE_MAX_TURNS", Value::from(max_turns))?;
+
+    cliclack::outro(format!(
+        "Set maximum turns to {} - Goose will ask for input after {} consecutive actions",
+        max_turns, max_turns
+    ))?;
+
     Ok(())
 }
