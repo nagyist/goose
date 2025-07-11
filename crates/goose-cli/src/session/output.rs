@@ -2,14 +2,17 @@ use bat::WrappingMode;
 use console::{style, Color};
 use goose::config::Config;
 use goose::message::{Message, MessageContent, ToolRequest, ToolResponse};
+use goose::providers::pricing::get_model_pricing;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use mcp_core::prompt::PromptArgument;
 use mcp_core::tool::ToolCall;
+use regex::Regex;
 use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Error;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 // Re-export theme for use in main
@@ -66,6 +69,17 @@ pub fn set_theme(theme: Theme) {
         .set_param("GOOSE_CLI_THEME", Value::String(theme.as_config_string()))
         .expect("Failed to set theme");
     CURRENT_THEME.with(|t| *t.borrow_mut() = theme);
+
+    let config = Config::global();
+    let theme_str = match theme {
+        Theme::Light => "light",
+        Theme::Dark => "dark",
+        Theme::Ansi => "ansi",
+    };
+
+    if let Err(e) = config.set_param("GOOSE_CLI_THEME", Value::String(theme_str.to_string())) {
+        eprintln!("Failed to save theme setting to config: {}", e);
+    }
 }
 
 pub fn get_theme() -> Theme {
@@ -114,6 +128,15 @@ pub fn show_thinking() {
 
 pub fn hide_thinking() {
     THINKING.with(|t| t.borrow_mut().hide());
+}
+
+#[allow(dead_code)]
+pub fn set_thinking_message(s: &String) {
+    THINKING.with(|t| {
+        if let Some(spinner) = t.borrow_mut().spinner.as_mut() {
+            spinner.set_message(s);
+        }
+    });
 }
 
 pub fn render_message(message: &Message, debug: bool) {
@@ -536,24 +559,58 @@ fn shorten_path(path: &str, debug: bool) -> String {
 }
 
 // Session display functions
-pub fn display_session_info(resume: bool, provider: &str, model: &str, session_file: &Path) {
+pub fn display_session_info(
+    resume: bool,
+    provider: &str,
+    model: &str,
+    session_file: &Option<PathBuf>,
+    provider_instance: Option<&Arc<dyn goose::providers::base::Provider>>,
+) {
     let start_session_msg = if resume {
         "resuming session |"
-    } else if session_file.to_str() == Some("/dev/null") || session_file.to_str() == Some("NUL") {
+    } else if session_file.is_none() {
         "running without session |"
     } else {
         "starting session |"
     };
-    println!(
-        "{} {} {} {} {}",
-        style(start_session_msg).dim(),
-        style("provider:").dim(),
-        style(provider).cyan().dim(),
-        style("model:").dim(),
-        style(model).cyan().dim(),
-    );
 
-    if session_file.to_str() != Some("/dev/null") && session_file.to_str() != Some("NUL") {
+    // Check if we have lead/worker mode
+    if let Some(provider_inst) = provider_instance {
+        if let Some(lead_worker) = provider_inst.as_lead_worker() {
+            let (lead_model, worker_model) = lead_worker.get_model_info();
+            println!(
+                "{} {} {} {} {} {} {}",
+                style(start_session_msg).dim(),
+                style("provider:").dim(),
+                style(provider).cyan().dim(),
+                style("lead model:").dim(),
+                style(&lead_model).cyan().dim(),
+                style("worker model:").dim(),
+                style(&worker_model).cyan().dim(),
+            );
+        } else {
+            println!(
+                "{} {} {} {} {}",
+                style(start_session_msg).dim(),
+                style("provider:").dim(),
+                style(provider).cyan().dim(),
+                style("model:").dim(),
+                style(model).cyan().dim(),
+            );
+        }
+    } else {
+        // Fallback to original behavior if no provider instance
+        println!(
+            "{} {} {} {} {}",
+            style(start_session_msg).dim(),
+            style("provider:").dim(),
+            style(provider).cyan().dim(),
+            style("model:").dim(),
+            style(model).cyan().dim(),
+        );
+    }
+
+    if let Some(session_file) = session_file {
         println!(
             "    {} {}",
             style("logging to").dim(),
@@ -578,12 +635,19 @@ pub fn display_greeting() {
 pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
     use console::style;
 
-    // Calculate percentage used
-    let percentage = (total_tokens as f64 / context_limit as f64 * 100.0).round() as usize;
+    if context_limit == 0 {
+        println!("Context: Error - context limit is zero");
+        return;
+    }
 
-    // Create dot visualization
+    // Calculate percentage used with bounds checking
+    let percentage =
+        (((total_tokens as f64 / context_limit as f64) * 100.0).round() as usize).min(100);
+
+    // Create dot visualization with safety bounds
     let dot_count = 10;
-    let filled_dots = ((percentage as f64 / 100.0) * dot_count as f64).round() as usize;
+    let filled_dots =
+        (((percentage as f64 / 100.0) * dot_count as f64).round() as usize).min(dot_count);
     let empty_dots = dot_count - filled_dots;
 
     let filled = "●".repeat(filled_dots);
@@ -604,6 +668,68 @@ pub fn display_context_usage(total_tokens: usize, context_limit: usize) {
         "Context: {} {}% ({}/{} tokens)",
         colored_dots, percentage, total_tokens, context_limit
     );
+}
+
+fn normalize_model_name(model: &str) -> String {
+    let mut result = model.to_string();
+
+    // Remove "-latest" suffix
+    if result.ends_with("-latest") {
+        result = result.strip_suffix("-latest").unwrap().to_string();
+    }
+
+    // Remove date-like suffixes: -YYYYMMDD
+    let re_date = Regex::new(r"-\d{8}$").unwrap();
+    if re_date.is_match(&result) {
+        result = re_date.replace(&result, "").to_string();
+    }
+
+    // Convert version numbers like -3-5- to -3.5- (e.g., claude-3-5-haiku -> claude-3.5-haiku)
+    let re_version = Regex::new(r"-(\d+)-(\d+)-").unwrap();
+    if re_version.is_match(&result) {
+        result = re_version.replace(&result, "-$1.$2-").to_string();
+    }
+
+    result
+}
+
+async fn estimate_cost_usd(
+    provider: &str,
+    model: &str,
+    input_tokens: usize,
+    output_tokens: usize,
+) -> Option<f64> {
+    // Use the pricing module's get_model_pricing which handles model name mapping internally
+    let cleaned_model = normalize_model_name(model);
+    let pricing_info = get_model_pricing(provider, &cleaned_model).await;
+
+    match pricing_info {
+        Some(pricing) => {
+            let input_cost = pricing.input_cost * input_tokens as f64;
+            let output_cost = pricing.output_cost * output_tokens as f64;
+            Some(input_cost + output_cost)
+        }
+        None => None,
+    }
+}
+
+/// Display cost information, if price data is available.
+pub async fn display_cost_usage(
+    provider: &str,
+    model: &str,
+    input_tokens: usize,
+    output_tokens: usize,
+) {
+    if let Some(cost) = estimate_cost_usd(provider, model, input_tokens, output_tokens).await {
+        use console::style;
+        println!(
+            "Cost: {} USD ({} tokens: in {}, out {})",
+            style(format!("${:.4}", cost)).cyan(),
+            input_tokens + output_tokens,
+            input_tokens,
+            output_tokens
+        );
+    }
 }
 
 pub struct McpSpinners {
@@ -660,6 +786,12 @@ impl McpSpinners {
     }
 
     pub fn hide(&mut self) -> Result<(), Error> {
+        self.bars.iter_mut().for_each(|(_, bar)| {
+            bar.disable_steady_tick();
+        });
+        if let Some(spinner) = self.log_spinner.as_mut() {
+            spinner.disable_steady_tick();
+        }
         self.multi_bar.clear()
     }
 }

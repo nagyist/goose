@@ -1,11 +1,13 @@
 mod builder;
 mod completion;
+mod export;
 mod input;
 mod output;
 mod prompt;
 mod thinking;
 
-pub use builder::{build_session, SessionBuilderConfig};
+pub use self::export::message_to_markdown;
+pub use builder::{build_session, SessionBuilderConfig, SessionSettings};
 use console::Color;
 use goose::agents::AgentEvent;
 use goose::permission::permission_confirmation::PrincipalType;
@@ -21,6 +23,7 @@ use goose::agents::extension::{Envs, ExtensionConfig};
 use goose::agents::{Agent, SessionConfig};
 use goose::config::Config;
 use goose::message::{Message, MessageContent};
+use goose::providers::pricing::initialize_pricing_cache;
 use goose::session;
 use input::InputResult;
 use mcp_core::handler::ToolError;
@@ -44,11 +47,13 @@ pub enum RunMode {
 pub struct Session {
     agent: Agent,
     messages: Vec<Message>,
-    session_file: PathBuf,
+    session_file: Option<PathBuf>,
     // Cache for completion data - using std::sync for thread safety without async
     completion_cache: Arc<std::sync::RwLock<CompletionCache>>,
     debug: bool, // New field for debug mode
     run_mode: RunMode,
+    scheduled_job_id: Option<String>, // ID of the scheduled job that triggered this session
+    max_turns: Option<u32>,
 }
 
 // Cache structure for completion data
@@ -105,13 +110,24 @@ pub async fn classify_planner_response(
 }
 
 impl Session {
-    pub fn new(agent: Agent, session_file: PathBuf, debug: bool) -> Self {
-        let messages = match session::read_messages(&session_file) {
-            Ok(msgs) => msgs,
-            Err(e) => {
-                eprintln!("Warning: Failed to load message history: {}", e);
-                Vec::new()
+    pub fn new(
+        agent: Agent,
+        session_file: Option<PathBuf>,
+        debug: bool,
+        scheduled_job_id: Option<String>,
+        max_turns: Option<u32>,
+    ) -> Self {
+        let messages = if let Some(session_file) = &session_file {
+            match session::read_messages(session_file) {
+                Ok(msgs) => msgs,
+                Err(e) => {
+                    eprintln!("Warning: Failed to load message history: {}", e);
+                    Vec::new()
+                }
             }
+        } else {
+            // Don't try to read messages if we're not saving sessions
+            Vec::new()
         };
 
         Session {
@@ -121,6 +137,8 @@ impl Session {
             completion_cache: Arc::new(std::sync::RwLock::new(CompletionCache::new())),
             debug,
             run_mode: RunMode::Normal,
+            scheduled_job_id,
+            max_turns,
         }
     }
 
@@ -305,12 +323,21 @@ impl Session {
         let provider = self.agent.provider().await?;
 
         // Persist messages with provider for automatic description generation
-        session::persist_messages(&self.session_file, &self.messages, Some(provider)).await?;
+        if let Some(session_file) = &self.session_file {
+            session::persist_messages_with_schedule_id(
+                session_file,
+                &self.messages,
+                Some(provider),
+                self.scheduled_job_id.clone(),
+            )
+            .await?;
+        }
 
         // Track the current directory and last instruction in projects.json
         let session_id = self
             .session_file
-            .file_stem()
+            .as_ref()
+            .and_then(|p| p.file_stem())
             .and_then(|s| s.to_str())
             .map(|s| s.to_string());
 
@@ -396,7 +423,8 @@ impl Session {
                             // Track the current directory and last instruction in projects.json
                             let session_id = self
                                 .session_file
-                                .file_stem()
+                                .as_ref()
+                                .and_then(|p| p.file_stem())
                                 .and_then(|s| s.to_str())
                                 .map(|s| s.to_string());
 
@@ -411,12 +439,15 @@ impl Session {
                             let provider = self.agent.provider().await?;
 
                             // Persist messages with provider for automatic description generation
-                            session::persist_messages(
-                                &self.session_file,
-                                &self.messages,
-                                Some(provider),
-                            )
-                            .await?;
+                            if let Some(session_file) = &self.session_file {
+                                session::persist_messages_with_schedule_id(
+                                    session_file,
+                                    &self.messages,
+                                    Some(provider),
+                                    self.scheduled_job_id.clone(),
+                                )
+                                .await?;
+                            }
 
                             output::show_thinking();
                             self.process_agent_response(true).await?;
@@ -469,6 +500,28 @@ impl Session {
                     output::set_theme(new_theme);
                     continue;
                 }
+
+                input::InputResult::SelectTheme(theme_name) => {
+                    save_history(&mut editor);
+
+                    let new_theme = match theme_name.as_str() {
+                        "light" => {
+                            println!("Switching to Light theme");
+                            output::Theme::Light
+                        }
+                        "dark" => {
+                            println!("Switching to Dark theme");
+                            output::Theme::Dark
+                        }
+                        "ansi" => {
+                            println!("Switching to Ansi theme");
+                            output::Theme::Ansi
+                        }
+                        _ => output::Theme::Dark,
+                    };
+                    output::set_theme(new_theme);
+                    continue;
+                }
                 input::InputResult::Retry => continue,
                 input::InputResult::ListPrompts(extension) => {
                     save_history(&mut editor);
@@ -517,6 +570,17 @@ impl Session {
                 input::InputResult::EndPlan => {
                     self.run_mode = RunMode::Normal;
                     output::render_exit_plan_mode();
+                    continue;
+                }
+                input::InputResult::Clear => {
+                    save_history(&mut editor);
+
+                    self.messages.clear();
+                    tracing::info!("Chat context cleared by user.");
+                    output::render_message(
+                        &Message::assistant().with_text("Chat context cleared."),
+                        self.debug,
+                    );
                     continue;
                 }
                 input::InputResult::PromptCommand(opts) => {
@@ -587,12 +651,15 @@ impl Session {
                         self.messages = summarized_messages;
 
                         // Persist the summarized messages
-                        session::persist_messages(
-                            &self.session_file,
-                            &self.messages,
-                            Some(provider),
-                        )
-                        .await?;
+                        if let Some(session_file) = &self.session_file {
+                            session::persist_messages_with_schedule_id(
+                                session_file,
+                                &self.messages,
+                                Some(provider),
+                                self.scheduled_job_id.clone(),
+                            )
+                            .await?;
+                        }
 
                         output::hide_thinking();
                         println!(
@@ -616,8 +683,11 @@ impl Session {
         }
 
         println!(
-            "\nClosing session. Recorded to {}",
-            self.session_file.display()
+            "\nClosing session.{}",
+            self.session_file
+                .as_ref()
+                .map(|p| format!(" Recorded to {}", p.display()))
+                .unwrap_or_default()
         );
         Ok(())
     }
@@ -705,18 +775,20 @@ impl Session {
     }
 
     async fn process_agent_response(&mut self, interactive: bool) -> Result<()> {
-        let session_id = session::Identifier::Path(self.session_file.clone());
+        let session_config = self.session_file.as_ref().map(|s| {
+            let session_id = session::Identifier::Path(s.clone());
+            SessionConfig {
+                id: session_id.clone(),
+                working_dir: std::env::current_dir()
+                    .expect("failed to get current session working directory"),
+                schedule_id: self.scheduled_job_id.clone(),
+                execution_mode: None,
+                max_turns: self.max_turns,
+            }
+        });
         let mut stream = self
             .agent
-            .reply(
-                &self.messages,
-                Some(SessionConfig {
-                    id: session_id.clone(),
-                    working_dir: std::env::current_dir()
-                        .expect("failed to get current session working directory"),
-                    schedule_id: None,
-                }),
-            )
+            .reply(&self.messages, session_config.clone())
             .await?;
 
         let mut progress_bars = output::McpSpinners::new();
@@ -725,7 +797,6 @@ impl Session {
         loop {
             tokio::select! {
                 result = stream.next() => {
-                    let _ = progress_bars.hide();
                     match result {
                         Some(Ok(AgentEvent::Message(message))) => {
                             // If it's a confirmation request, get approval but otherwise do not render/persist
@@ -764,7 +835,15 @@ impl Session {
                                         Err(ToolError::ExecutionError("Tool call cancelled by user".to_string()))
                                     ));
                                     self.messages.push(response_message);
-                                    session::persist_messages(&self.session_file, &self.messages, None).await?;
+                                    if let Some(session_file) = &self.session_file {
+                                        session::persist_messages_with_schedule_id(
+                                            session_file,
+                                            &self.messages,
+                                            None,
+                                            self.scheduled_job_id.clone(),
+                                        )
+                                        .await?;
+                                    }
 
                                     drop(stream);
                                     break;
@@ -846,12 +925,7 @@ impl Session {
                                     .agent
                                     .reply(
                                         &self.messages,
-                                        Some(SessionConfig {
-                                            id: session_id.clone(),
-                                            working_dir: std::env::current_dir()
-                                                .expect("failed to get current session working directory"),
-                                            schedule_id: None,
-                                        }),
+                                        session_config.clone(),
                                     )
                                     .await?;
                             }
@@ -860,9 +934,18 @@ impl Session {
                                 self.messages.push(message.clone());
 
                                 // No need to update description on assistant messages
-                                session::persist_messages(&self.session_file, &self.messages, None).await?;
+                                if let Some(session_file) = &self.session_file {
+                                    session::persist_messages_with_schedule_id(
+                                        session_file,
+                                        &self.messages,
+                                        None,
+                                        self.scheduled_job_id.clone(),
+                                    )
+                                    .await?;
+                                }
 
                                 if interactive {output::hide_thinking()};
+                                let _ = progress_bars.hide();
                                 output::render_message(&message, self.debug);
                                 if interactive {output::show_thinking()};
                             }
@@ -876,21 +959,88 @@ impl Session {
                                 match method.as_str() {
                                     "notifications/message" => {
                                         let data = o.get("data").unwrap_or(&Value::Null);
-                                        let message = match data {
-                                            Value::String(s) => s.clone(),
+                                        let (formatted_message, subagent_id, _notification_type) = match data {
+                                            Value::String(s) => (s.clone(), None, None),
                                             Value::Object(o) => {
-                                                if let Some(Value::String(output)) = o.get("output") {
-                                                    output.to_owned()
+                                                // Check for subagent notification structure first
+                                                if let Some(Value::String(msg)) = o.get("message") {
+                                                    // Extract subagent info for better display
+                                                    let subagent_id = o.get("subagent_id")
+                                                        .and_then(|v| v.as_str())
+                                                        .unwrap_or("unknown");
+                                                    let notification_type = o.get("type")
+                                                        .and_then(|v| v.as_str())
+                                                        .unwrap_or("");
+
+                                                    let formatted = match notification_type {
+                                                        "subagent_created" | "completed" | "terminated" => {
+                                                            format!("🤖 {}", msg)
+                                                        }
+                                                        "tool_usage" | "tool_completed" | "tool_error" => {
+                                                            format!("🔧 {}", msg)
+                                                        }
+                                                        "message_processing" | "turn_progress" => {
+                                                            format!("💭 {}", msg)
+                                                        }
+                                                        "response_generated" => {
+                                                            // Check verbosity setting for subagent response content
+                                                            let config = Config::global();
+                                                            let min_priority = config
+                                                                .get_param::<f32>("GOOSE_CLI_MIN_PRIORITY")
+                                                                .ok()
+                                                                .unwrap_or(0.5);
+
+                                                            if min_priority > 0.1 && !self.debug {
+                                                                // High/Medium verbosity: show truncated response
+                                                                if let Some(response_content) = msg.strip_prefix("Responded: ") {
+                                                                    if response_content.len() > 100 {
+                                                                        format!("🤖 Responded: {}...", &response_content[..100])
+                                                                    } else {
+                                                                        format!("🤖 {}", msg)
+                                                                    }
+                                                                } else {
+                                                                    format!("🤖 {}", msg)
+                                                                }
+                                                            } else {
+                                                                // All verbosity or debug: show full response
+                                                                format!("🤖 {}", msg)
+                                                            }
+                                                        }
+                                                        _ => {
+                                                            msg.to_string()
+                                                        }
+                                                    };
+                                                    (formatted, Some(subagent_id.to_string()), Some(notification_type.to_string()))
+                                                } else if let Some(Value::String(output)) = o.get("output") {
+                                                    // Fallback for other MCP notification types
+                                                    (output.to_owned(), None, None)
                                                 } else {
-                                                    data.to_string()
+                                                    (data.to_string(), None, None)
                                                 }
                                             },
                                             v => {
-                                                    v.to_string()
+                                                (v.to_string(), None, None)
                                             },
                                         };
-                                        // output::render_text_no_newlines(&message, None, true);
-                                        progress_bars.log(&message);
+
+                                        // Handle subagent notifications - show immediately
+                                        if let Some(_id) = subagent_id {
+                                            // Show subagent notifications immediately (no buffering) with compact spacing
+                                            if interactive {
+                                                let _ = progress_bars.hide();
+                                                println!("{}", console::style(&formatted_message).green().dim());
+                                            } else {
+                                                progress_bars.log(&formatted_message);
+                                            }
+                                        } else {
+                                            // Non-subagent notification, display immediately with compact spacing
+                                            if interactive {
+                                                let _ = progress_bars.hide();
+                                                println!("{}", console::style(&formatted_message).green().dim());
+                                            } else {
+                                                progress_bars.log(&formatted_message);
+                                            }
+                                        }
                                     },
                                     "notifications/progress" => {
                                         let progress = o.get("progress").and_then(|v| v.as_f64());
@@ -912,6 +1062,13 @@ impl Session {
                                 }
                             }
                         }
+                        Some(Ok(AgentEvent::ModelChange { model, mode })) => {
+                            // Log model change if in debug mode
+                            if self.debug {
+                                eprintln!("Model changed to {} in {} mode", model, mode);
+                            }
+                        }
+
                         Some(Err(e)) => {
                             eprintln!("Error: {}", e);
                             drop(stream);
@@ -984,7 +1141,15 @@ impl Session {
             self.messages.push(response_message);
 
             // No need for description update here
-            session::persist_messages(&self.session_file, &self.messages, None).await?;
+            if let Some(session_file) = &self.session_file {
+                session::persist_messages_with_schedule_id(
+                    session_file,
+                    &self.messages,
+                    None,
+                    self.scheduled_job_id.clone(),
+                )
+                .await?;
+            }
 
             let prompt = format!(
                 "The existing call to {} was interrupted. How would you like to proceed?",
@@ -993,7 +1158,15 @@ impl Session {
             self.messages.push(Message::assistant().with_text(&prompt));
 
             // No need for description update here
-            session::persist_messages(&self.session_file, &self.messages, None).await?;
+            if let Some(session_file) = &self.session_file {
+                session::persist_messages_with_schedule_id(
+                    session_file,
+                    &self.messages,
+                    None,
+                    self.scheduled_job_id.clone(),
+                )
+                .await?;
+            }
 
             output::render_message(&Message::assistant().with_text(&prompt), self.debug);
         } else {
@@ -1007,8 +1180,15 @@ impl Session {
                             self.messages.push(Message::assistant().with_text(prompt));
 
                             // No need for description update here
-                            session::persist_messages(&self.session_file, &self.messages, None)
+                            if let Some(session_file) = &self.session_file {
+                                session::persist_messages_with_schedule_id(
+                                    session_file,
+                                    &self.messages,
+                                    None,
+                                    self.scheduled_job_id.clone(),
+                                )
                                 .await?;
+                            }
 
                             output::render_message(
                                 &Message::assistant().with_text(prompt),
@@ -1032,7 +1212,7 @@ impl Session {
         Ok(())
     }
 
-    pub fn session_file(&self) -> PathBuf {
+    pub fn session_file(&self) -> Option<PathBuf> {
         self.session_file.clone()
     }
 
@@ -1106,13 +1286,12 @@ impl Session {
         );
     }
 
-    /// Get the session metadata
     pub fn get_metadata(&self) -> Result<session::SessionMetadata> {
-        if !self.session_file.exists() {
+        if !self.session_file.as_ref().is_some_and(|f| f.exists()) {
             return Err(anyhow::anyhow!("Session file does not exist"));
         }
 
-        session::read_metadata(&self.session_file)
+        session::read_metadata(self.session_file.as_ref().unwrap())
     }
 
     // Get the session's total token usage
@@ -1125,13 +1304,42 @@ impl Session {
     pub async fn display_context_usage(&self) -> Result<()> {
         let provider = self.agent.provider().await?;
         let model_config = provider.get_model_config();
-        let context_limit = model_config.context_limit.unwrap_or(32000);
+        let context_limit = model_config.context_limit();
+
+        let config = Config::global();
+        let show_cost = config
+            .get_param::<bool>("GOOSE_CLI_SHOW_COST")
+            .unwrap_or(false);
+
+        let provider_name = config
+            .get_param::<String>("GOOSE_PROVIDER")
+            .unwrap_or_else(|_| "unknown".to_string());
+
+        // Initialize pricing cache on startup
+        tracing::info!("Initializing pricing cache...");
+        if let Err(e) = initialize_pricing_cache().await {
+            tracing::warn!(
+                "Failed to initialize pricing cache: {e}. Pricing data may not be available."
+            );
+        }
 
         match self.get_metadata() {
             Ok(metadata) => {
                 let total_tokens = metadata.total_tokens.unwrap_or(0) as usize;
 
                 output::display_context_usage(total_tokens, context_limit);
+
+                if show_cost {
+                    let input_tokens = metadata.input_tokens.unwrap_or(0) as usize;
+                    let output_tokens = metadata.output_tokens.unwrap_or(0) as usize;
+                    output::display_cost_usage(
+                        &provider_name,
+                        &model_config.model_name,
+                        input_tokens,
+                        output_tokens,
+                    )
+                    .await;
+                }
             }
             Err(_) => {
                 output::display_context_usage(0, context_limit);
@@ -1272,7 +1480,8 @@ fn get_reasoner() -> Result<Arc<dyn Provider>, anyhow::Error> {
             .expect("No model configured. Run 'goose configure' first")
     };
 
-    let model_config = ModelConfig::new(model);
+    let model_config =
+        ModelConfig::new_with_context_env(model, Some("GOOSE_PLANNER_CONTEXT_LIMIT"));
     let reasoner = create(&provider, model_config)?;
 
     Ok(reasoner)

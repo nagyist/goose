@@ -19,6 +19,7 @@ use super::utils::{emit_debug_trace, get_model, handle_response_openai_compat, I
 use crate::config::{Config, ConfigError};
 use crate::message::Message;
 use crate::model::ModelConfig;
+use crate::providers::base::ConfigKey;
 use mcp_core::tool::Tool;
 
 pub const GITHUB_COPILOT_DEFAULT_MODEL: &str = "gpt-4o";
@@ -138,7 +139,7 @@ impl GithubCopilotProvider {
 
     async fn post(&self, mut payload: Value) -> Result<Value, ProviderError> {
         use crate::providers::utils_universal_openai_stream::{OAIStreamChunk, OAIStreamCollector};
-        use futures_util::StreamExt;
+        use futures::StreamExt;
         // Detect gpt-4.1 and stream
         let model_name = payload.get("model").and_then(|v| v.as_str()).unwrap_or("");
         let stream_only_model = GITHUB_COPILOT_STREAM_MODELS
@@ -230,7 +231,7 @@ impl GithubCopilotProvider {
 
     async fn refresh_api_info(&self) -> Result<CopilotTokenInfo> {
         let config = Config::global();
-        let token = match config.get_secret::<String>("GITHUB_TOKEN") {
+        let token = match config.get_secret::<String>("GITHUB_COPILOT_TOKEN") {
             Ok(token) => token,
             Err(err) => match err {
                 ConfigError::NotFound(_) => {
@@ -238,7 +239,7 @@ impl GithubCopilotProvider {
                         .get_access_token()
                         .await
                         .context("unable to login into github")?;
-                    config.set_secret("GITHUB_TOKEN", Value::String(token.clone()))?;
+                    config.set_secret("GITHUB_COPILOT_TOKEN", Value::String(token.clone()))?;
                     token
                 }
                 _ => return Err(err.into()),
@@ -389,7 +390,7 @@ impl Provider for GithubCopilotProvider {
             GITHUB_COPILOT_DEFAULT_MODEL,
             GITHUB_COPILOT_KNOWN_MODELS.to_vec(),
             GITHUB_COPILOT_DOC_URL,
-            vec![],
+            vec![ConfigKey::new("GITHUB_COPILOT_TOKEN", true, true, None)],
         )
     }
 

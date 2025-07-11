@@ -7,6 +7,9 @@ license.workspace = true
 repository.workspace = true
 description.workspace = true
 
+[lints]
+workspace = true
+
 [lib]
 crate-type = ["lib", "cdylib"]
 name = "goose_llm"
@@ -59,3 +62,7 @@ path = "uniffi-bindgen.rs"
 [[example]]
 name = "simple"
 path = "examples/simple.rs"
+
+[[example]]
+name = "prompt_override"
+path = "examples/prompt_override.rs"
