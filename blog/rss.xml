@@ -15,16 +15,17 @@
             <pubDate>Fri, 19 Dec 2025 00:00:00 GMT</pubDate>
             <description><![CDATA[Two new ways to use goose]]></description>
             <content:encoded><![CDATA[<p><img decoding="async" loading="lazy" alt="goose on iOS - access your personal desktop agent from anywhere" src="https://block.github.io/goose/assets/images/mobile_shots-a1231226854fb0aff4d230dd64291077.png" width="1598" height="1086" class="img_ev3q"></p>
-<p>We're excited to announce two new ways to interact with goose: a <a href="https://apps.apple.com/au/app/goose-ai/id6752889295">native iOS app</a> for mobile access and native terminal integration. Both give you more flexibility in how and where you use your AI agent.</p>
+<p>We're excited to announce two new ways to interact with goose: a <a href="https://apps.apple.com/app/goose-ai/id6752889295">native iOS app</a> for mobile access and native terminal integration. Both give you more flexibility in how and where you use your AI agent.</p>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="goose-ios-app">goose iOS App<a href="https://block.github.io/goose/blog/2025/12/19/goose-mobile-terminal#goose-ios-app" class="hash-link" aria-label="Direct link to goose iOS App" title="Direct link to goose iOS App" translate="no">​</a></h2>
 <p>goose is now available on the App Store! The iOS app connects to your desktop goose instance via a secure tunnel, letting you interact with your agent from anywhere.</p>
 <h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="getting-started-with-mobile">Getting Started with Mobile<a href="https://block.github.io/goose/blog/2025/12/19/goose-mobile-terminal#getting-started-with-mobile" class="hash-link" aria-label="Direct link to Getting Started with Mobile" title="Direct link to Getting Started with Mobile" translate="no">​</a></h3>
 <ol>
-<li class=""><strong>Install the app</strong> - Download <a href="https://apps.apple.com/au/app/goose-ai/id6752889295" target="_blank" rel="noopener noreferrer" class="">goose from the App Store</a></li>
+<li class=""><strong>Install the app</strong> - Download <a href="https://apps.apple.com/app/goose-ai/id6752889295" target="_blank" rel="noopener noreferrer" class="">goose from the App Store</a></li>
 <li class=""><strong>Enable remote access</strong> - In the goose desktop app, go to App Settings and turn on "Remote Access"</li>
 <li class=""><strong>Scan the QR code</strong> - Use the iOS app to scan the QR code displayed in your desktop app</li>
 <li class=""><strong>Start working</strong> - You're connected! Your mobile app now tunnels to your goose desktop instance</li>
 </ol>
+<p>See the <a class="" href="https://block.github.io/goose/docs/experimental/mobile-access">Mobile Access guide</a> for detailed steps.</p>
 <p>This means you get the full power of your desktop goose setup—all your extensions and configurations—accessible from your phone. Whether you're on the train, grabbing coffee, or just away from your desk, you can still ask goose to help with tasks or check on long-running things. Throw an idea out there for it to go to work on and pick it up later.</p>
 <p>The goose iOS app also runs natively on macOS (Apple Silicon Macs), giving you another lightweight option for accessing your goose instance from another device.</p>
 <h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="native-terminal-support">Native Terminal Support<a href="https://block.github.io/goose/blog/2025/12/19/goose-mobile-terminal#native-terminal-support" class="hash-link" aria-label="Direct link to Native Terminal Support" title="Direct link to Native Terminal Support" translate="no">​</a></h2>
