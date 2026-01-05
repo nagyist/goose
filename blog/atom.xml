@@ -2,11 +2,77 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://block.github.io/goose/blog</id>
     <title>goose Blog</title>
-    <updated>2025-12-28T00:00:00.000Z</updated>
+    <updated>2026-01-04T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://block.github.io/goose/blog"/>
     <subtitle>goose Blog</subtitle>
     <icon>https://block.github.io/goose/img/favicon.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[How I Taught My Agent My Design Taste]]></title>
+        <id>https://block.github.io/goose/blog/2026/01/04/how-i-taught-my-agent-my-design-taste</id>
+        <link href="https://block.github.io/goose/blog/2026/01/04/how-i-taught-my-agent-my-design-taste"/>
+        <updated>2026-01-04T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[I used Agent Skills and recipes to automate execution so I could study taste, constraint design, feedback loops, and avoid AI smells.]]></summary>
+        <content type="html"><![CDATA[<p><img decoding="async" loading="lazy" alt="blog cover" src="https://block.github.io/goose/assets/images/automate-taste-9a928fdbc3c8e4d335dba61401ede6bc.png" width="1920" height="1080" class="img_ev3q"></p>
+<p>Can you automate taste? The short answer is no, you cannot automate taste, but I did make my design preferences legible.</p>
+<p>But for those interested in my experiment, I'll share the longer answer: I wanted to participate in <a href="https://genuary.art/" target="_blank" rel="noopener noreferrer" class="">Genuary</a>, the annual challenge where people create one piece of creative coding every day in January.</p>
+<p>My goal here wasn't to "outsource" my creativity. Instead, I wanted to use Genuary as a sandbox to learn agentic engineering workflows. These workflows are becoming the standard for how developers work with technology. To keep my skills sharp, I used <a class="" href="https://block.github.io/goose/">goose</a> to experiment with these workflows in small, daily bursts.</p>
+<p>By building a system where goose handles the execution, I could test different architectures side-by-side. This experiment allowed me to determine which parts of an agentic workflow actually add value and which parts I should ditch. I spent a few hours focused on infrastructure to buy myself an entire month of workflow data.</p>
+<div class="theme-admonition theme-admonition-tip admonition_xJq3 alert alert--success"><div class="admonitionHeading_Gvgb"><span class="admonitionIcon_Rf37"><svg viewBox="0 0 12 16"><path fill-rule="evenodd" d="M6.5 0C3.48 0 1 2.19 1 5c0 .92.55 2.25 1 3 1.34 2.25 1.78 2.78 2 4v1h5v-1c.22-1.22.66-1.75 2-4 .45-.75 1-2.08 1-3 0-2.81-2.48-5-5.5-5zm3.64 7.48c-.25.44-.47.8-.67 1.11-.86 1.41-1.25 2.06-1.45 3.23-.02.05-.02.11-.02.17H5c0-.06 0-.13-.02-.17-.2-1.17-.59-1.83-1.45-3.23-.2-.31-.42-.67-.67-1.11C2.44 6.78 2 5.65 2 5c0-2.2 2.02-4 4.5-4 1.22 0 2.36.42 3.22 1.19C10.55 2.94 11 3.94 11 5c0 .66-.44 1.78-.86 2.48zM4 14h5c-.23 1.14-1.3 2-2.5 2s-2.27-.86-2.5-2z"></path></svg></span>tip</div><div class="admonitionContent_BuS1"><p><a class="" href="https://block.github.io/goose/docs/guides/context-engineering/using-skills">Skills</a> are reusable sets of instructions and resources that teach goose how to perform specific tasks.</p></div></div>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-inspiration">The Inspiration<a href="https://block.github.io/goose/blog/2026/01/04/how-i-taught-my-agent-my-design-taste#the-inspiration" class="hash-link" aria-label="Direct link to The Inspiration" title="Direct link to The Inspiration" translate="no">​</a></h2>
+<p>I have to give a huge shout-out to my friend <a href="https://www.linkedin.com/posts/andrewzigler_genuary4-genuary2026-activity-7413652312495149056-5jA-" target="_blank" rel="noopener noreferrer" class="">Andrew Zigler</a>. I saw him crushing Genuary and reached out to see how he was doing it. He shared his creations and mentioned he was using a "harness."</p>
+<p>I'll admit, I'd been seeing people use that term all December, but I didn't actually know what it meant. Andrew explained: a harness is just the toolbox you build for the model. It's the set of deterministic scripts that wrap the LLM so it can interact with your environment reliably. He had used this approach to solve a different challenge, building a system that could iterate, submit, and verify itself.</p>
+<p>He justified that if you spend time upfront working on a spec and establishing constraints. Then, you delegate. Once you have deterministic tools with good logging, the agent is incredibly good at looping until it hits its goal.</p>
+<p>My approach is typically very vanilla, and I lean heavily on prompting, but I was open to experimenting since Andrew was getting such excellent results.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="harness-vs-skills">Harness vs. Skills<a href="https://block.github.io/goose/blog/2026/01/04/how-i-taught-my-agent-my-design-taste#harness-vs-skills" class="hash-link" aria-label="Direct link to Harness vs. Skills" title="Direct link to Harness vs. Skills" translate="no">​</a></h2>
+<p>Inspired by that conversation, I built two versions of the same workflow to see how they handled the same daily Genuary prompts.</p>
+<ul>
+<li class=""><strong>Approach 1: Harness + <a class="" href="https://block.github.io/goose/docs/tutorials/recipes-tutorial">Recipe</a></strong>: This lives in <code>/genuary</code>. Following Zig's lead, I wrote a shell script to act as the harness. It handles the scaffolding, creating folders and surfacing the daily prompt, so goose doesn't have to guess where to go. The recipe is about 300 lines long and fully self-contained.</li>
+<li class=""><strong>Approach 2: Skills + Recipe</strong>: This lives in <code>/genuary-skills</code>. This recipe is much leaner because it delegates the "how" to a skill. The skill contains the design philosophy, references, and examples. I wanted to see how the work changed when the agent had to "discover" its instructions in a bundle rather than following a flat script.</li>
+</ul>
+<p>I spent one focused session building the entire system: <a href="https://github.com/blackgirlbytes/genuary2026/blob/main/genuary/genuary.yaml" target="_blank" rel="noopener noreferrer" class="">recipes</a>, <a href="https://github.com/blackgirlbytes/genuary2026/blob/main/genuary-skills/.goose/skills/genuary/SKILL.md" target="_blank" rel="noopener noreferrer" class="">skills</a>, harness scripts, templates, and <a href="https://github.com/blackgirlbytes/genuary2026/tree/main/.github/workflows" target="_blank" rel="noopener noreferrer" class="">GitHub Actions</a>. (This happened in the quiet hours of my December break, with my one-year-old sleeping on my lap.) This was about trading short-term effort for long-term leverage. From that point on, the system did the daily work.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="on-taste">On Taste<a href="https://block.github.io/goose/blog/2026/01/04/how-i-taught-my-agent-my-design-taste#on-taste" class="hash-link" aria-label="Direct link to On Taste" title="Direct link to On Taste" translate="no">​</a></h2>
+<p>The automation was smooth, but when I reviewed the output, I noticed everything looked suspiciously similar.</p>
+<p>That's when I started to think about the discourse on how you can't teach an agent "taste." I thought about how I develop taste. I honestly develop taste by:</p>
+<ul>
+<li class="">Seeing what's cool and copying it.</li>
+<li class="">Knowing what's overplayed because you've seen it too much.</li>
+<li class="">Following people with "good taste" and absorbing their patterns.</li>
+</ul>
+<p>Obviously, I approached goose about this problem:</p>
+<blockquote>
+<p>"I noticed it always does salmon colored circles..i know we said creative..any ideas on how to make sure it thinks outside the box"</p>
+</blockquote>
+<p><img decoding="async" loading="lazy" alt="Salmon colored circles - a common AI generated cliché" src="https://block.github.io/goose/assets/images/salmon-circles-58f1d0a4a5dd9cd7a7013435fc14bf42.png" width="1600" height="1600" class="img_ev3q"></p>
+<p>goose shared that it was following a p5.js template it retrieved, which included a <code>fill(255, 100, 100)</code> (salmon!) value and an ellipse example. Since LLMs anchor heavily on concrete examples, the agent was following the code more than my "creative" instructions.</p>
+<p>I removed the salmon circle from the template, but then I took it further: I asked how to ban common AI generated clichés altogether. goose searched discussions, pulled examples, and produced a banned list of patterns that scream "AI-generated."</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="banned-clichés">BANNED CLICHÉS<a href="https://block.github.io/goose/blog/2026/01/04/how-i-taught-my-agent-my-design-taste#banned-clich%C3%A9s" class="hash-link" aria-label="Direct link to BANNED CLICHÉS" title="Direct link to BANNED CLICHÉS" translate="no">​</a></h3>
+<table><thead><tr><th style="text-align:left">Category</th><th style="text-align:left">Banned Patterns</th></tr></thead><tbody><tr><td style="text-align:left">Color Crimes</td><td style="text-align:left">Salmon or coral pink, teal and orange combinations, purple-pink-blue gradients.</td></tr><tr><td style="text-align:left">Composition Crimes</td><td style="text-align:left">Single centered shapes, perfect symmetry with no variation, generic spirals.</td></tr><tr><td style="text-align:left">The Gold Rule</td><td style="text-align:left">If it looks like an AI generated output, do not do it.</td></tr></tbody></table>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="encouraged-patterns">ENCOURAGED PATTERNS<a href="https://block.github.io/goose/blog/2026/01/04/how-i-taught-my-agent-my-design-taste#encouraged-patterns" class="hash-link" aria-label="Direct link to ENCOURAGED PATTERNS" title="Direct link to ENCOURAGED PATTERNS" translate="no">​</a></h3>
+<table><thead><tr><th style="text-align:left">Category</th><th style="text-align:left">Encouraged Patterns</th></tr></thead><tbody><tr><td style="text-align:left">Color Wins</td><td style="text-align:left">HSB mode with shifting hues, complementary palettes, gradients that evolve over time.</td></tr><tr><td style="text-align:left">Composition Wins</td><td style="text-align:left">Particle systems with emergent behavior, layered depth with transparency, hundreds of elements interacting.</td></tr><tr><td style="text-align:left">Movement Wins</td><td style="text-align:left">Noise-based flow fields, flocking/swarming, organic growth patterns, breathing with variation.</td></tr><tr><td style="text-align:left">Inspiration Sources</td><td style="text-align:left">Natural phenomena: starlings murmurating, fireflies, aurora, smoke, water.</td></tr><tr><td style="text-align:left">The Gold Rule</td><td style="text-align:left">If it sparks joy and someone would want to share it, you're on the right track.</td></tr></tbody></table>
+<p>goose determined this list through pattern recognition. So perhaps, agents can use patterns to reflect my taste, not because they understand beauty, but because I'm explicitly teaching them what I personally respond to.</p>
+<p>I showed Andrew my favorite output of the three days: butterflies lining themselves in a Fibonacci sequence.</p>
+<p><img decoding="async" loading="lazy" alt="Butterflies arranged in a Fibonacci spiral" src="https://block.github.io/goose/assets/images/fibonacci-butterflies-9e1c44f859dc7bcca043f3def8fb0111.png" width="1600" height="1600" class="img_ev3q"></p>
+<p>His response was validating:</p>
+<blockquote>
+<p>"WOW that's an incredible Fibonacci… I'd be really curious to know your aesthetic prompting. Mine leans more pixel art and mathematical color manipulation because I've conditioned it that way… I like that yours leaned softer and tried to not look computer-created… like phone wallpaper practically lol..How did you even get that cool thinned line art on the butterflies? It looks like a base image. It's so cool. Did it draw SVGs? Like where did those come from?"</p>
+</blockquote>
+<p>Because I'd specifically told goose to look at "natural phenomena" and "organic growth," it used Bezier curves for the wings and shifted the colors based on the spiral position to create depth, and a warm amber-to-blue gradient instead of stark black.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="scaling-visual-feedback-loops">Scaling Visual Feedback Loops<a href="https://block.github.io/goose/blog/2026/01/04/how-i-taught-my-agent-my-design-taste#scaling-visual-feedback-loops" class="hash-link" aria-label="Direct link to Scaling Visual Feedback Loops" title="Direct link to Scaling Visual Feedback Loops" translate="no">​</a></h2>
+<p>Both workflows use the <a class="" href="https://block.github.io/goose/docs/mcp/chrome-devtools-mcp">Chrome DevTools MCP server</a> so goose can see the output and iterate on it. This created a conflict where multiple instances couldn't use the same Chrome profile. I didn't want a manual step, so I asked the agent if it was possible to run Chrome DevTools in parallel. The solution was assigning separate user data directories.</p>
+<div class="language-yaml codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-yaml codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token comment" style="color:#999988;font-style:italic"># genuary recipe example</span><span class="token plain"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain"> </span><span class="token key atrule" style="color:#00a4db">type</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> stdio</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">  </span><span class="token key atrule" style="color:#00a4db">name</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> Chrome Dev Tools</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">  </span><span class="token key atrule" style="color:#00a4db">cmd</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"> npx</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">  </span><span class="token key atrule" style="color:#00a4db">args</span><span class="token punctuation" style="color:#393A34">:</span><span class="token plain"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain"> </span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain">y</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain"> chrome</span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain">devtools</span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain">mcp@latest</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain"> </span><span class="token punctuation" style="color:#393A34">-</span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain">userDataDir</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    </span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain"> /tmp/genuary</span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain">harness</span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain">chrome</span><span class="token punctuation" style="color:#393A34">-</span><span class="token plain">profile</span><br></span></code></pre></div></div>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="what-i-learned">What I Learned<a href="https://block.github.io/goose/blog/2026/01/04/how-i-taught-my-agent-my-design-taste#what-i-learned" class="hash-link" aria-label="Direct link to What I Learned" title="Direct link to What I Learned" translate="no">​</a></h2>
+<p>I automated execution so I could study taste, constraint design, and feedback loops.</p>
+<p>The two approaches behaved very differently. The harness-based workflow was more reliable and efficient, but it produced more predictable results. It followed instructions faithfully and optimized for consistency.</p>
+<p>The skills-based approach was messier. It surfaced more surprises, made stranger connections, and required more editorial intervention. But the output felt more like a collaboration than a pipeline.</p>
+<p>What this reinforced for me is that the "AI vs. human" framing is too simplistic. Automation handles repetition and speed well. Taste still lives in constraint-setting, curation, and deciding what should never happen. I ended up not automating taste. Instead, the end result was a system that made my preferences legible enough to be reflected back to me.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="see-the-code">See the Code<a href="https://block.github.io/goose/blog/2026/01/04/how-i-taught-my-agent-my-design-taste#see-the-code" class="hash-link" aria-label="Direct link to See the Code" title="Direct link to See the Code" translate="no">​</a></h2>
+<p>The code and full transcripts live in <a href="https://github.com/blackgirlbytes/genuary2026" target="_blank" rel="noopener noreferrer" class="">my Genuary 2026 repo</a>. Each day folder contains the complete conversation history, including the pitches, iterations, and the back-and-forth between me and the agent. You can also view the creations on the <a href="https://genuary2026.vercel.app/" target="_blank" rel="noopener noreferrer" class="">Genuary 2026 site</a>.</p>
+]]></content>
+        <author>
+            <name>Rizel Scarlett</name>
+        </author>
+    </entry>
     <entry>
         <title type="html"><![CDATA[How We Use goose to Maintain goose]]></title>
         <id>https://block.github.io/goose/blog/2025/12/28/goose-maintains-goose</id>
@@ -1312,67 +1378,6 @@ If not, you’ll either need to wait for more SDKs to drop or build your own bin
 ]]></content>
         <author>
             <name>Ebony Louis</name>
-        </author>
-    </entry>
-    <entry>
-        <title type="html"><![CDATA[When AI Becomes Your New Team Member: The Story of Goose Janitor]]></title>
-        <id>https://block.github.io/goose/blog/2025/08/28/ai-teammate</id>
-        <link href="https://block.github.io/goose/blog/2025/08/28/ai-teammate"/>
-        <updated>2025-08-28T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[How an engineering team is trialling autonomous AI-powered technical debt cleanup]]></summary>
-        <content type="html"><![CDATA[<p><img decoding="async" loading="lazy" alt="blog banner" src="https://block.github.io/goose/assets/images/goose-janitor-129889884d9265d001fe12cbfde03d57.png" width="1200" height="630" class="img_ev3q"></p>
-<p>Over the years, Block's iOS engineers have felt the pain of technical debt accumulating. Feature flags are a specific example of this. Even when successfully rolled out, they tend to linger in the codebase, each one a small weight slowing down development.</p>
-<p>In the early stages of 2025, with a renewed focus on developer acceleration, the Foundation iOS team decided to organize 'Feature Flag Removal Month' - an opportunity for teams in the large iOS monorepo to come together and delete <em>possibly hundreds of thousands of lines of dead code</em>.</p>
-<p>With the serendipitous launch of Goose recipes around the same time, the team wondered could a dedicated recipe aid this effort? <a href="https://www.linkedin.com/in/gemmakbarlow/" target="_blank" rel="noopener noreferrer" class="">Gemma Barlow</a>, a newer iOS engineer on the team, wanted to find out.</p>
-<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="phase-1-making-knowledge-ai-accessible">Phase 1: Making Knowledge AI-Accessible<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#phase-1-making-knowledge-ai-accessible" class="hash-link" aria-label="Direct link to Phase 1: Making Knowledge AI-Accessible" title="Direct link to Phase 1: Making Knowledge AI-Accessible" translate="no">​</a></h2>
-<p>Gemma's first move was to utilize an existing system of <code>.mdc</code>, <code>.goosehints</code> and other symlinked context documents to capture how to safely remove feature flags from the repository.</p>
-<p>She added documentation that allows AI agents to glean enough context to perform their removal work accurately.</p>
-<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="phase-2-validation-across-generations">Phase 2: Validation Across Generations<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#phase-2-validation-across-generations" class="hash-link" aria-label="Direct link to Phase 2: Validation Across Generations" title="Direct link to Phase 2: Validation Across Generations" translate="no">​</a></h2>
-<p>Given AI documentation is designed to work with a variety of tools in use at Block, further iteration and validation was needed. Several weeks of tests and trials later, it was confirmed the approach was accurate enough to be useful <em>and</em> it could handle the three different generations of feature flag implementations that had accumulated:</p>
-<ul>
-<li class="">super legacy flags the team used way back yonder</li>
-<li class="">legacy flags that were newer but are now old</li>
-<li class="">current implementation of feature flags</li>
-</ul>
-<p>This documentation alone would help teams clean up faster. But now, AI could also understand and safely navigate the complexity of real world legacy systems in most scenarios, a win for developer velocity! 🎉</p>
-<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="phase-3-building-an-ai-team-member">Phase 3: Building an AI Team Member<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#phase-3-building-an-ai-team-member" class="hash-link" aria-label="Direct link to Phase 3: Building an AI Team Member" title="Direct link to Phase 3: Building an AI Team Member" translate="no">​</a></h2>
-<p>This was great progress. Gemma could have stopped here.</p>
-<p>But instead, she utilized Goose recipes to create <strong>Goose Janitor</strong>.</p>
-<p>Goose Janitor acts as new AI team member whose responsibility is to tidy up the code after we're done experimenting. It was heavily inspired by existing <a class="" href="https://block.github.io/goose/recipes/detail/?id=clean-up-feature-flag">Goose recipes</a> and internal discussions and experimentation occurring elsewhere in Block. Here's how it is run:</p>
-<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">goose run \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--recipe .goose/recipes/goose-janitor-flag-removal.yaml \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params feature_flag_key=log-observer-is-enabled \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params variant_to_remain=true \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">--params create_pr=false</span><br></span></code></pre></div></div>
-<p>The recipe:</p>
-<ul>
-<li class="">Runs completely autonomously (no human intervention needed)</li>
-<li class="">Handles different flag implementations, ranging in complexity</li>
-<li class="">Attempts refactoring for outdated code paths</li>
-<li class="">Can automatically create draft pull requests, via the Github CLI</li>
-<li class="">Integrates with <a href="https://github.com/block/xcode-index-mcp" target="_blank" rel="noopener noreferrer" class="">Xcode Index MCP</a> for deep iOS project understanding</li>
-<li class="">Plans, implements, builds and tests locally to improve the accuracy of the flag removal result</li>
-</ul>
-<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-bigger-picture-ai-first-development">The Bigger Picture: AI-First Development<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#the-bigger-picture-ai-first-development" class="hash-link" aria-label="Direct link to The Bigger Picture: AI-First Development" title="Direct link to The Bigger Picture: AI-First Development" translate="no">​</a></h2>
-<p>Recipes like Goose Janitor represent a fundamental shift in how we think about AI in software development. They can be deployed to:</p>
-<ul>
-<li class="">Understand complex legacy codebases</li>
-<li class="">Make safe refactoring decisions</li>
-<li class="">Integrate seamlessly with existing development workflows</li>
-<li class="">Provide developer velocity improvements</li>
-<li class="">Scale across large codebases</li>
-</ul>
-<p>Teams at Block are confident that Goose Janitor will be of assistance in production scale cleanup work.</p>
-<p>This is exactly the kind of work AI should handle: tedious, repetitive, but requiring deep codebase knowledge. By automating portions of their work, developers can focus on what they do best, which is building new features and solving novel problems while AI keeps the codebase clean and maintainable.</p>
-<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-ai-first-mindset">The AI-First Mindset<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#the-ai-first-mindset" class="hash-link" aria-label="Direct link to The AI-First Mindset" title="Direct link to The AI-First Mindset" translate="no">​</a></h2>
-<p>This story illustrates what an AI-first approach to legacy codebases looks like in practice.</p>
-<p>Start by making tribal knowledge AI-accessible. Test and validate that AI can actually handle the complexity with enough accuracy to prove useful. Even if manual intervention is required for complex cases, a first pass performed by AI can be a useful boost to productivity. Build automation that scales across teams and focus human energy on high value creative work.</p>
-<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="whats-next">What's Next?<a href="https://block.github.io/goose/blog/2025/08/28/ai-teammate#whats-next" class="hash-link" aria-label="Direct link to What's Next?" title="Direct link to What's Next?" translate="no">​</a></h2>
-<p>The success of Goose Janitor opens up fascinating possibilities. What other forms of technical debt could benefit from this approach? What other "AI team members" could we build to handle routine but knowledge intensive work?</p>
-<p>As we move toward an AI-first future, stories like Gemma's show us the path. Not just using AI tools, but thinking systematically about how to make our codebases and processes AI-ready.</p>
-<p>The future of software development is mixed teams where AI agents are autonomous contributors, handling the maintenance work that keeps our systems healthy while humans focus on building the future.</p>
-<hr>
-<p>Want the tweak the base recipe for your own needs? Check out <a class="" href="https://block.github.io/goose/recipes/detail/?id=clean-up-feature-flag">Clean up feature flag</a> in our Recipe Cookbook!</p>
-]]></content>
-        <author>
-            <name>Angie Jones</name>
-            <uri>https://angiejones.tech</uri>
         </author>
     </entry>
 </feed>
